@@ -1,0 +1,159 @@
+\documentclass[14pt,a4paper]{article}
+\usepackage[top=2cm, bottom=2cm, left=3.5cm, right=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,gensymb,amsthm} 
+\usepackage{graphicx}           
+\usepackage[colorlinks=true]{hyperref} 
+\usepackage[affil-it]{authblk}
+\usepackage{minted}
+\usepackage{booktabs}          
+\usepackage{multirow}      
+\usepackage{caption}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{siunitx}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{LightGray}{gray}{0.9}
+\usemintedstyle{vs}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{LightGray},   
+    breakatwhitespace=false,     
+    basicstyle=\ttfamily\footnotesize,    
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false
+}
+\lstset{style=mystyle}
+
+\title{CS217 Assignment 6}        
+\author{Zhige Chen\quad 12413315}
+\affil{Department of Computer Science and Engineering, Southern University of Science and Technology, China}
+\date{\today}
+
+\begin{document}
+    \maketitle
+    \begin{abstract}
+        This project conducts a comprehensive performance evaluation comparing database management systems (PostgreSQL and openGauss) against manual file operations (including the JSON and BEVE format) using an employee database schema. This experiments reveal that PostgreSQL is generally faster than openGauss, and using DBMS can lead to less resource usage and provide significant advantages for complex queries and maintainability.
+    \end{abstract}
+    \tableofcontents
+    
+    \section{Project Overview}
+    The \textbf{database management systems} (DBMS) have become fundamental to modern data management, but understanding their performance characteristics compared to traditional file operations remains crucial. This projects evaluates PostgreSQL and openGauss against file-based data management using a realistic employee database schema. The benchmarks are implemented in C++.
+    
+    \section{Experimental Setup}
+    \subsection{Environment Configuration}
+    \begin{itemize}
+        \item \textbf{Hardware}: AMD Ryzen 9 7945HX,  64GB DDR4 4800\unit{MHz} RAM, SK Hynix PC801 2T SSD
+        \item \textbf{PostgreSQL}: Version 18.0.1, default configuration, running in Docker container
+        \item \textbf{openGauss}: Version 7.0.0-RC1 build 10d38387, default configuration, running in Docker container
+        \item \textbf{Docker}: Version 28.5.1, build e180ab8
+        \item \textbf{C++ Compiler}: Clang 21.1.1, target x86\_64-w64-windows-gnu
+        \item \textbf{Dataset}: Employee data with 3919015 records and 333\unit{MB} installed size, see the \href{https://github.com/neondatabase-labs/postgres-sample-dbs?tab=readme-ov-file#employees-database}{Github repository}
+    \end{itemize}
+    
+    \subsection{Libraries Used}
+    \begin{itemize}
+        \item 
+    \end{itemize}
+    
+    \subsection{Measurement Methodology}
+    
+    \section{Experiment Results}
+    \subsection{Data Retrieval Performance Comparison}
+    
+    \subsection{Data Update Performance Comparison}
+    
+    \subsection{Advanced Comparisons: Different File Format}
+    
+    \section{Analysis and Discussion}
+    
+    \section{Conclusion}
+    
+    \appendix
+    \section{Appendix A: Source Code Repository}
+    The complete source code and report source can be found at \href{https://github.com/nofe1248/cs213-project1}{nofe1248/cs213-project1}.
+    
+    \section{Appendix B: Generative AI Usage}
+    \textbf{Deepseek-R1} was used to generate the structure of this project report and convert the raw benchmark results into LaTeX tables.
+    
+    \section{Appendix C: Raw Experimental Data}
+    \subsection{Retrieval Test 1}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            LIMIT 100 & 10 & 1 & \qty{665.128}{\micro\second} & \qty{218.046}{\micro\second} & \qty{4.65005}{\milli\second} \\
+            LIMIT 500 & 10 & 1 & \qty{615.008}{\micro\second} & \qty{211.992}{\micro\second} & \qty{5.10992}{\milli\second} \\
+            LIMIT 1000 & 10 & 1 & \qty{710.618}{\micro\second} & \qty{153.451}{\micro\second} & \qty{5.76876}{\milli\second} \\
+            LIMIT 5000 & 10 & 1 & \qty{1.40599}{\milli\second} & \qty{582.315}{\micro\second} & \qty{11.6519}{\milli\second} \\
+            LIMIT 10000 & 10 & 1 & \qty{2.48725}{\milli\second} & \qty{719.83}{\micro\second} & \qty{19.8189}{\milli\second} \\
+            LIMIT 50000 & 10 & 1 & \qty{5.66898}{\milli\second} & \qty{927.226}{\micro\second} & \qty{63.1476}{\milli\second} \\
+            LIMIT 100000 & 10 & 1 & \qty{9.82808}{\milli\second} & \qty{827.53}{\micro\second} & \qty{105.203}{\milli\second} \\
+            LIMIT 500000 & 10 & 1 & \qty{46.985}{\milli\second} & \qty{3.95693}{\milli\second} & \qty{469.665}{\milli\second} \\
+            LIMIT 1000000 & 10 & 1 & \qty{91.9645}{\milli\second} & \qty{2.9558}{\milli\second} & \qty{906.421}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{PostgreSQL SELECT Performance Benchmark Results}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            LIMIT 100 & 10 & 1 & \qty{571.108}{\micro\second} & \qty{179.701}{\micro\second} & \qty{4.9526}{\milli\second} \\
+            LIMIT 500 & 10 & 1 & \qty{814.068}{\micro\second} & \qty{346.285}{\micro\second} & \qty{5.78684}{\milli\second} \\
+            LIMIT 1000 & 10 & 1 & \qty{722.528}{\micro\second} & \qty{238.369}{\micro\second} & \qty{6.59098}{\milli\second} \\
+            LIMIT 5000 & 10 & 1 & \qty{1.13025}{\milli\second} & \qty{243.238}{\micro\second} & \qty{11.1561}{\milli\second} \\
+            LIMIT 10000 & 10 & 1 & \qty{1.78246}{\milli\second} & \qty{202.507}{\micro\second} & \qty{17.5614}{\milli\second} \\
+            LIMIT 50000 & 10 & 1 & \qty{6.64121}{\milli\second} & \qty{690.447}{\micro\second} & \qty{63.5856}{\milli\second} \\
+            LIMIT 100000 & 10 & 1 & \qty{12.6365}{\milli\second} & \qty{968.095}{\micro\second} & \qty{123.897}{\milli\second} \\
+            LIMIT 500000 & 10 & 1 & \qty{60.994}{\milli\second} & \qty{2.7992}{\milli\second} & \qty{592.659}{\milli\second} \\
+            LIMIT 1000000 & 10 & 1 & \qty{118.201}{\milli\second} & \qty{2.23525}{\milli\second} & \qty{1.20241}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{openGauss SELECT Performance Benchmark Results}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Benchmark Name} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            File Loading & 10 & 1 & \qty{262.61}{\milli\second} & \qty{14.152}{\milli\second} & \qty{4.69128}{\second} \\
+            \addlinespace
+            Reading 100 & 10 & 68 & \qty{342.324}{\nano\second} & \qty{79.9492}{\nano\second} & \qty{226.44}{\micro\second} \\
+            Reading 500 & 10 & 34 & \qty{690.529}{\nano\second} & \qty{179.585}{\nano\second} & \qty{225.76}{\micro\second} \\
+            Reading 1000 & 10 & 23 & \qty{1.07687}{\micro\second} & \qty{307.625}{\nano\second} & \qty{227.7}{\micro\second} \\
+            Reading 5000 & 10 & 6 & \qty{4.678}{\micro\second} & \qty{1.76252}{\micro\second} & \qty{243.6}{\micro\second} \\
+            Reading 10000 & 10 & 3 & \qty{11.126}{\micro\second} & \qty{4.81144}{\micro\second} & \qty{276.63}{\micro\second} \\
+            Reading 50000 & 10 & 1 & \qty{93.458}{\micro\second} & \qty{89.8841}{\micro\second} & \qty{415.4}{\micro\second} \\
+            Reading 100000 & 10 & 1 & \qty{283.348}{\micro\second} & \qty{84.9363}{\micro\second} & \qty{2.27196}{\milli\second} \\
+            Reading 500000 & 10 & 1 & \qty{2.12196}{\milli\second} & \qty{434.837}{\micro\second} & \qty{18.9072}{\milli\second} \\
+            Reading 1000000 & 10 & 1 & \qty{4.36252}{\milli\second} & \qty{291.284}{\micro\second} & \qty{41.0047}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{JSON File Reading Performance Benchmark Results}
+    \end{table}
+    
+    \section{Appendix D: Test Code}
+    \subsection{Retrieval Test 1}
+    
+    \inputminted[bgcolor=LightGray,breaklines,breakafter=d]{cpp}{ret_test_1_pg.cpp}
+    
+    \inputminted[bgcolor=LightGray,breaklines,breakafter=d]{cpp}{ret_test_1_og.cpp}
+    
+    \inputminted[bgcolor=LightGray,breaklines,breakafter=d]{cpp}{ret_test_1_js.cpp}
+    
+    \inputminted[bgcolor=LightGray,breaklines,breakafter=d]{cpp}{ret_test_1_be.cpp}
+\end{document}

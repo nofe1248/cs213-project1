@@ -1,0 +1,9 @@
+/.idea
+/report/_minted
+/deps/
+employees.sql.gz
+/report/project_report.aux
+/report/project_report.log
+/report/project_report.out
+/report/project_report.synctex.gz
+/report/project_report.toc
