@@ -506,7 +506,7 @@ TEST_CASE("retrieval-test-3-opengauss", "[retrieval-open][retrieval-test-3][retr
                 auto const &a = kv.second;                                                                             \
                 if (a.count > 0) {                                                                                     \
                     double avg = static_cast<double>(a.sum) / static_cast<double>(a.count);                            \
-                    sum += avg; /* 与 SQL 测试一致：将各部门的 AVG 累加到整型 */                                       \
+                    sum += avg;                                       \
                 }                                                                                                      \
             }                                                                                                          \
             return sum;                                                                                                \

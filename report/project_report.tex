@@ -13,6 +13,7 @@
 \usepackage{siunitx}
 \usepackage{listings}
 \usepackage{xcolor}
+\usepackage{diagbox}
 
 \definecolor{LightGray}{gray}{0.9}
 \usemintedstyle{vs}
@@ -58,21 +59,280 @@
     
     \subsection{Libraries Used}
     \begin{itemize}
-        \item 
+        \item \href{https://github.com/jtv/libpqxx}{\textbf{libpqxx}} is used to interact with PostgreSQL and openGauss.
+        \item \href{https://github.com/catchorg/Catch2/}{\textbf{Catch2}} is used to write unit tests and benchmarks for the experiments.
+        \item \href{https://github.com/stephenberry/glaze/}{\textbf{Glaze}} is used to read/write JSON and BEVE format files.
     \end{itemize}
     
     \subsection{Measurement Methodology}
     
-    \section{Experiment Results}
-    \subsection{Data Retrieval Performance Comparison}
+    The timing measurements are all conducted using the \texttt{ADVANCED\_BENCHMARK()} marco of \textbf{Catch2} library. Each experiements is sampled for 10 times and each sample contains at least 1 iteration. Then average and standard deviation is reported.
     
-    \subsection{Data Update Performance Comparison}
+    To ensure noninterference across multiple benchmarks, separate transactions/file loading are used in individual benchmarks.
+    
+    \section{Experiment Results}
+    \subsection{Retrieval Performance Comparison}
+    \subsubsection{Retrieval Test 1}
+    \textbf{Query}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+SELECT amount FROM salary ORDER BY employee_id LIMIT [query_limit];
+    \end{minted}    
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \diagbox{\textbf{Engine}}{\textbf{Data Size}} & 100 & 500 & 1000 & 5000 & 10000\\
+            \midrule
+            PostgreSQL & \qty{1.24791}{ms} & \qty{1.2535}{ms} & \qty{1.48245}{ms} & \qty{2.96659}{ms} & \qty{3.15038}{ms}\\
+            openGauss & \qty{1.13957}{ms} & \qty{1.23223}{ms} & \qty{1.25402}{ms} & \qty{2.18557}{ms} & \qty{3.50267}{ms}\\
+            JSON (w/o file loading) & \qty{14.3659}{ns} & \qty{123.442}{ns} & \qty{607.379}{ns} & \qty{6.36233}{\micro\second} & \qty{26.198}{\micro\second}\\
+            JSON (w/ file loading) & \qty{742.861}{ms} & \qty{742.861}{ms} & \qty{742.861}{ms} & \qty{742.867}{ms} & \qty{742.887}{ms}\\
+            \bottomrule
+            \toprule
+            \diagbox{\textbf{Engine}}{\textbf{Data Size}} & 50000 & 100000 & 500000 & 1000000 &\\
+            \midrule
+            PostgreSQL & \qty{15.0285}{ms} & \qty{20.8607}{ms} & \qty{97.3349}{ms} & \qty{189.96}{ms} &\\
+            openGauss & \qty{14.1096}{ms} & \qty{27.3405}{ms} & \qty{617.438}{ms} & \qty{681.953}{ms} &\\	
+            JSON (w/o file loading) & \qty{686.888}{\micro\second} & \qty{12.0072}{ms} & \qty{3.02301}{ms} & \qty{4.68098}{ms} &\\
+            JSON (w/ file loading) & \qty{743.548}{ms} & \qty{744.062}{ms} & \qty{745.884}{ms} & \qty{747.542}{ms} &\\
+            \bottomrule            
+        \end{tabular}
+        \caption{Retrieval Test 1 Benchmark Results}
+    \end{table}
+    
+    \subsubsection{Retrieval Test 2}
+    \textbf{Query}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+SELECT e.first_name, e.last_name, d.dept_name, t.title, s.amount
+    FROM employee e
+    JOIN department_employee de ON e.id = de.employee_id
+    JOIN department d ON de.department_id = d.id
+    JOIN title t ON e.id = t.employee_id
+    JOIN salary s ON e.id = s.employee_id
+    WHERE e.hire_date > [date];
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lrrrr}
+            \toprule
+            \diagbox{\textbf{Engine}}{\textbf{Filter}} & >1997-01-01 & >1998-01-01 & >1999-01-01 & >2000-01-01\\
+            \midrule
+            PostgreSQL & \qty{17.547}{ms} & \qty{34.5756}{ms} & \qty{94.0941}{ms} & \qty{184.327}{ms}\\
+            openGauss & \qty{34.0926}{ms} & \qty{182.512}{ms} & \qty{313.017}{ms} & \qty{467.861}{ms}\\
+            JSON (w/o file loading) & \qty{10.5896}{ms} & \qty{12.820}{ms} & \qty{15.0948}{ms} & \qty{16.6291}{ms}\\
+            JSON (w/ file loading) & \qty{831.721}{ms} & \qty{833.951}{ms} & \qty{847.226}{ms} & \qty{848.7601}{ms}\\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    
+    \subsubsection{Retrieval Test 3}
+    \textbf{Query}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+SELECT d.dept_name, COUNT(e.id), AVG(s.amount)
+    FROM department d
+    JOIN department_employee de ON d.id = de.department_id
+    JOIN employee e ON de.employee_id = e.id
+    JOIN salary s ON e.id = s.employee_id
+    WHERE s.to_date = '9999-01-01'
+    GROUP BY d.dept_name;
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Engine} & \textbf{Time}\\
+            \midrule
+            PostgreSQL & \qty{270.564}{ms}\\
+            openGauss & \qty{615.559}{ms}\\
+            JSON (w/o file loading) & \qty{20.7729}{ms}\\
+            JSON (w/ file loading) & \qty{712.5289}{ms}\\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    
+    \subsubsection{Retrieval Test 4}
+    \textbf{Query}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+SELECT * FROM employee WHERE first_name LIKE 'John%' OR last_name LIKE '%son';
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Engine} & \textbf{Time}\\
+            \midrule
+            PostgreSQL & \qty{21.875}{ms}\\
+            openGauss & \qty{42.291}{ms}\\
+            JSON (w/o file loading) & \qty{5.746}{ms}\\
+            JSON (w/ file loading) & \qty{169.184}{ms}\\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    
+    \subsubsection{Retrieval Test 5}    
+    \textbf{Query}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+SELECT * FROM employee 
+    WHERE hire_date BETWEEN [start_date] AND [end_date]
+    ORDER BY hire_date DESC;
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lrrr}
+            \toprule
+            \diagbox{\textbf{Engine}}{\textbf{Ramge}} & 1995-01-01 to 1997-12-31 & 1992-01-01 to 2000-12-31 & 1990-01-01 to 2022-12-31\\
+            \midrule
+            PostgreSQL & \qty{34.0679}{ms} & \qty{65.4671}{ms} & \qty{86.5669}{ms}\\
+            openGauss & \qty{48.0719}{ms} & \qty{92.2885}{ms} & \qty{127.505}{ms}\\
+            JSON (w/o file loading) & \qty{11.22}{ms} & \qty{12.5463}{ms} & \qty{11.9194}{ms}\\
+            JSON (w/ file loading) & \qty{149.229}{ms} & \qty{150.555}{ms} & \qty{149.9284}{ms}\\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    
+    \subsection{Update Performance Comparison}
+    \subsubsection{Update Test 1}
+    \textbf{Update}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+UPDATE employee SET first_name = 'John' WHERE id = [random_id];
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Engine} & \textbf{Time}\\
+            \midrule
+            PostgreSQL & \qty{3.96289}{\milli\second}\\
+            openGauss & \qty{3.51769}{\milli\second}\\
+            JSON & \qty{264.204}{\milli\second}\\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 1 Performance}
+    \end{table}
+    
+    \subsubsection{Update Test 2}
+    \textbf{Update}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+UPDATE salary SET amount = amount + 1 WHERE to_date = '9999-01-01';
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Engine} & \textbf{Time}\\
+            \midrule
+            PostgreSQL & \qty{838.78}{\milli\second}\\
+            openGauss & \qty{1.49578}{\second}\\
+            JSON & \qty{1.40019}{\second}\\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 2 Performance}
+    \end{table}
+    \textbf{Conclusion}:
+    
+    \subsubsection{Update Test 3}
+    \textbf{Update}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+BEGIN;
+UPDATE department_employee SET to_date = CURRENT_DATE 
+    WHERE employee_id = [random_id] AND to_date = '9999-01-01';
+INSERT INTO department_employee VALUES ([random_id], [random_dept_id], CURRENT_DATE, '9999-01-01');
+COMMIT;
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Engine} & \textbf{Time}\\
+            \midrule
+            PostgreSQL & \qty{34.2222}{\milli\second}\\
+            openGauss & \qty{55.9333}{\milli\second}\\
+            JSON & \qty{149.989}{\milli\second}\\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 3 Performance}
+    \end{table}
+    \textbf{Conclusion}:
+    
+    \subsubsection{Update Test 4}
+    \textbf{Update}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+UPDATE title SET title = 'Senior Engineer' 
+    WHERE title = 'Engineer' AND from_date < '2010-01-01';
+    \end{minted}
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Engine} & \textbf{Time} \\
+            \midrule
+            PostgreSQL & \qty{26.7132}{\milli\second}\\
+            openGauss & \qty{46.4891}{\milli\second}\\
+            JSON & \qty{218.601}{\milli\second}\\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 4 Performance}
+    \end{table}
+    \textbf{Conclusion}:
     
     \subsection{Advanced Comparisons: Different File Format}
+    For additional comparison, we used the \textbf{BEVE} (Binery Efficient Versatile Encoding). It's a tagged binary data specification designed for higher performance and scientific computing. For more infor, see the \href{Github repository}{https://github.com/beve-org/beve}.
+    \textbf{Query}:
+    \begin{minted}[bgcolor=LightGray,breaklines,breakafter=d]{postgres}
+SELECT amount FROM salary ORDER BY employee_id LIMIT [query_limit];
+    \end{minted}    
+    \textbf{Results}:
+    \begin{table}[H]
+        \centering
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \diagbox{\textbf{Engine}}{\textbf{Data Size}} & 100 & 500 & 1000 & 5000 & 10000\\
+            \midrule
+            PostgreSQL & \qty{1.24791}{ms} & \qty{1.2535}{ms} & \qty{1.48245}{ms} & \qty{2.96659}{ms} & \qty{3.15038}{ms}\\
+            openGauss & \qty{1.13957}{ms} & \qty{1.23223}{ms} & \qty{1.25402}{ms} & \qty{2.18557}{ms} & \qty{3.50267}{ms}\\
+            JSON (w/ file loading) & \qty{742.861}{ms} & \qty{742.861}{ms} & \qty{742.861}{ms} & \qty{742.867}{ms} & \qty{742.887}{ms}\\
+            \textbf{BEVE (w/ file loading)} & \qty{206.300}{ms} & \qty{206.300}{ms} & \qty{206.301}{ms} & \qty{206.303}{ms} & \qty{206.310}{ms}\\
+            \bottomrule
+            \toprule
+            \diagbox{\textbf{Engine}}{\textbf{Data Size}} & 50000 & 100000 & 500000 & 1000000 &\\
+            \midrule
+            PostgreSQL & \qty{15.0285}{ms} & \qty{20.8607}{ms} & \qty{97.3349}{ms} & \qty{189.96}{ms} &\\
+            openGauss & \qty{14.1096}{ms} & \qty{27.3405}{ms} & \qty{617.438}{ms} & \qty{681.953}{ms} &\\
+            JSON (w/ file loading) & \qty{743.548}{ms} & \qty{744.062}{ms} & \qty{745.884}{ms} & \qty{747.542}{ms} &\\
+            \textbf{BEVE (w/ file loading)} & \qty{206.509}{ms} & \qty{206.647}{ms} & \qty{208.035}{ms} & \qty{210.949}{ms} &\\
+            \bottomrule            
+        \end{tabular}
+        \caption{Additional Format Benchmark Results}
+    \end{table}
     
     \section{Analysis and Discussion}
+    \textbf{1. DBMS vs. File Operations}:
+    \begin{itemize}
+        \item For any applications that need complex data query and modifications, DBMS is way better than manual file operations. They eliminate the need to load the whole file into memory every operation, and reduce the develop burden as we no longer need to write ad-hoc code for specific tasks. They can also optimize our operations and maintain data integrity through transactions.
+        \item For very specific circumstances where we only need to perform very simple tasks on already cached data, e.g. traversal, the file-based approach can be faster. This is mainly because it performs a direct linear scan without overhead of SQL parsing, optimizing, planning, and client-server communication. But these scenarios are considerably rare in real-world applications. We can already see from the results that the BEVE format can provide performance close to DBMSs.
+    \end{itemize}    
+    \textbf{2. PostgreSQL vs. openGauss}:    
+    
+    Across almost every test, PostgreSQL demonstrated significantly better performance than openGauss. The performance gap was most pronounced in complex queries (Retrieval Test 2, 3) and large-scale updates (Update Test 2), where PostgreSQL was often twice as fast or more. We consider that this lead can be attributed to several factors: more mature optimizer, efficient execution engine, less overhead on personal computer (since openGauss is designed specifically for enterprises).
     
     \section{Conclusion}
+    
+    This project conducted a performance evaluation of two DBMSs, PostgreSQL and openGauss, against manual file operations using JSON and BEVE formats for an realistic employee database. The results lead to two conclusions:
+    \begin{itemize}
+        \item First, DBMS are superior to file-based operations for dynamic applications involving complex queries and data modifications. Although the manual file processing is faster if we have the whole file in memory, the extreme cost of fil I/O renders this approach impractical since it will require much more memory and is inefficient for data updates (since our naive implementation don't have indexing and needs an linear search when finding the data).
+        \item Second, in a direct comparison of the two DBMSs, PostgreSQL exhibited consistently better performance then openGauss across a wide range of benchmarks.
+    \end{itemize}
+    
+    In summary, while optimized file formats like BEVE have a potential usage in high-performance scenarios, the use of DBMS is recommended for nearly all applications due to its performance, scalability, and maintainability.
     
     \appendix
     \section{Appendix A: Source Code Repository}
@@ -90,60 +350,293 @@
             \toprule
             \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
             \midrule
-            LIMIT 100 & 10 & 1 & \qty{665.128}{\micro\second} & \qty{218.046}{\micro\second} & \qty{4.65005}{\milli\second} \\
-            LIMIT 500 & 10 & 1 & \qty{615.008}{\micro\second} & \qty{211.992}{\micro\second} & \qty{5.10992}{\milli\second} \\
-            LIMIT 1000 & 10 & 1 & \qty{710.618}{\micro\second} & \qty{153.451}{\micro\second} & \qty{5.76876}{\milli\second} \\
-            LIMIT 5000 & 10 & 1 & \qty{1.40599}{\milli\second} & \qty{582.315}{\micro\second} & \qty{11.6519}{\milli\second} \\
-            LIMIT 10000 & 10 & 1 & \qty{2.48725}{\milli\second} & \qty{719.83}{\micro\second} & \qty{19.8189}{\milli\second} \\
-            LIMIT 50000 & 10 & 1 & \qty{5.66898}{\milli\second} & \qty{927.226}{\micro\second} & \qty{63.1476}{\milli\second} \\
-            LIMIT 100000 & 10 & 1 & \qty{9.82808}{\milli\second} & \qty{827.53}{\micro\second} & \qty{105.203}{\milli\second} \\
-            LIMIT 500000 & 10 & 1 & \qty{46.985}{\milli\second} & \qty{3.95693}{\milli\second} & \qty{469.665}{\milli\second} \\
-            LIMIT 1000000 & 10 & 1 & \qty{91.9645}{\milli\second} & \qty{2.9558}{\milli\second} & \qty{906.421}{\milli\second} \\
+            LIMIT 100 & 10 & 1 & \qty{1.24791}{\milli\second} & \qty{145.879}{\micro\second} & \qty{5.25932}{\milli\second} \\
+            LIMIT 500 & 10 & 1 & \qty{1.2535}{\milli\second} & \qty{149.054}{\micro\second} & \qty{5.46128}{\milli\second} \\
+            LIMIT 1000 & 10 & 1 & \qty{1.48245}{\milli\second} & \qty{144.062}{\micro\second} & \qty{6.94705}{\milli\second} \\
+            LIMIT 5000 & 10 & 1 & \qty{2.96659}{\milli\second} & \qty{480.329}{\micro\second} & \qty{16.088}{\milli\second} \\
+            LIMIT 10000 & 10 & 1 & \qty{3.15038}{\milli\second} & \qty{243.688}{\micro\second} & \qty{23.5395}{\milli\second} \\
+            LIMIT 50000 & 10 & 1 & \qty{15.0285}{\milli\second} & \qty{7.27859}{\milli\second} & \qty{92.4291}{\milli\second} \\
+            LIMIT 100000 & 10 & 1 & \qty{20.8607}{\milli\second} & \qty{617.642}{\micro\second} & \qty{190.795}{\milli\second} \\
+            LIMIT 500000 & 10 & 1 & \qty{97.3349}{\milli\second} & \qty{1.45221}{\milli\second} & \qty{1.36007}{\second} \\
+            LIMIT 1000000 & 10 & 1 & \qty{189.96}{\milli\second} & \qty{2.82049}{\milli\second} & \qty{2.43646}{\second} \\
             \bottomrule
         \end{tabular}
-        \caption{PostgreSQL SELECT Performance Benchmark Results}
-    \end{table}
-    
-    \begin{table}[H]
-        \centering
-        \begin{tabular}{lrrrrr}
-            \toprule
-            \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
-            \midrule
-            LIMIT 100 & 10 & 1 & \qty{571.108}{\micro\second} & \qty{179.701}{\micro\second} & \qty{4.9526}{\milli\second} \\
-            LIMIT 500 & 10 & 1 & \qty{814.068}{\micro\second} & \qty{346.285}{\micro\second} & \qty{5.78684}{\milli\second} \\
-            LIMIT 1000 & 10 & 1 & \qty{722.528}{\micro\second} & \qty{238.369}{\micro\second} & \qty{6.59098}{\milli\second} \\
-            LIMIT 5000 & 10 & 1 & \qty{1.13025}{\milli\second} & \qty{243.238}{\micro\second} & \qty{11.1561}{\milli\second} \\
-            LIMIT 10000 & 10 & 1 & \qty{1.78246}{\milli\second} & \qty{202.507}{\micro\second} & \qty{17.5614}{\milli\second} \\
-            LIMIT 50000 & 10 & 1 & \qty{6.64121}{\milli\second} & \qty{690.447}{\micro\second} & \qty{63.5856}{\milli\second} \\
-            LIMIT 100000 & 10 & 1 & \qty{12.6365}{\milli\second} & \qty{968.095}{\micro\second} & \qty{123.897}{\milli\second} \\
-            LIMIT 500000 & 10 & 1 & \qty{60.994}{\milli\second} & \qty{2.7992}{\milli\second} & \qty{592.659}{\milli\second} \\
-            LIMIT 1000000 & 10 & 1 & \qty{118.201}{\milli\second} & \qty{2.23525}{\milli\second} & \qty{1.20241}{\second} \\
-            \bottomrule
-        \end{tabular}
-        \caption{openGauss SELECT Performance Benchmark Results}
+        \caption{PostgreSQL SELECT Performance (Retrieval Test 1)}
     \end{table}
     
     \begin{table}[H]
         \centering        
         \begin{tabular}{lrrrrr}
             \toprule
-            \textbf{Benchmark Name} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
             \midrule
-            File Loading & 10 & 1 & \qty{262.61}{\milli\second} & \qty{14.152}{\milli\second} & \qty{4.69128}{\second} \\
-            \addlinespace
-            Reading 100 & 10 & 68 & \qty{342.324}{\nano\second} & \qty{79.9492}{\nano\second} & \qty{226.44}{\micro\second} \\
-            Reading 500 & 10 & 34 & \qty{690.529}{\nano\second} & \qty{179.585}{\nano\second} & \qty{225.76}{\micro\second} \\
-            Reading 1000 & 10 & 23 & \qty{1.07687}{\micro\second} & \qty{307.625}{\nano\second} & \qty{227.7}{\micro\second} \\
-            Reading 5000 & 10 & 6 & \qty{4.678}{\micro\second} & \qty{1.76252}{\micro\second} & \qty{243.6}{\micro\second} \\
-            Reading 10000 & 10 & 3 & \qty{11.126}{\micro\second} & \qty{4.81144}{\micro\second} & \qty{276.63}{\micro\second} \\
-            Reading 50000 & 10 & 1 & \qty{93.458}{\micro\second} & \qty{89.8841}{\micro\second} & \qty{415.4}{\micro\second} \\
-            Reading 100000 & 10 & 1 & \qty{283.348}{\micro\second} & \qty{84.9363}{\micro\second} & \qty{2.27196}{\milli\second} \\
-            Reading 500000 & 10 & 1 & \qty{2.12196}{\milli\second} & \qty{434.837}{\micro\second} & \qty{18.9072}{\milli\second} \\
-            Reading 1000000 & 10 & 1 & \qty{4.36252}{\milli\second} & \qty{291.284}{\micro\second} & \qty{41.0047}{\milli\second} \\
+            LIMIT 100 & 10 & 1 & \qty{1.13957}{\milli\second} & \qty{251.143}{\micro\second} & \qty{5.53279}{\milli\second} \\
+            LIMIT 500 & 10 & 1 & \qty{1.23223}{\milli\second} & \qty{249.885}{\micro\second} & \qty{7.85008}{\milli\second} \\
+            LIMIT 1000 & 10 & 1 & \qty{1.25402}{\milli\second} & \qty{128.532}{\micro\second} & \qty{7.83551}{\milli\second} \\
+            LIMIT 5000 & 10 & 1 & \qty{2.18557}{\milli\second} & \qty{86.997}{\micro\second} & \qty{17.853}{\milli\second} \\
+            LIMIT 10000 & 10 & 1 & \qty{3.50267}{\milli\second} & \qty{162.915}{\micro\second} & \qty{31.3957}{\milli\second} \\
+            LIMIT 50000 & 10 & 1 & \qty{14.1096}{\milli\second} & \qty{190.007}{\micro\second} & \qty{134.13}{\milli\second} \\
+            LIMIT 100000 & 10 & 1 & \qty{27.3405}{\milli\second} & \qty{867.596}{\micro\second} & \qty{261.998}{\milli\second} \\
+            LIMIT 500000 & 10 & 1 & \qty{617.438}{\milli\second} & \qty{32.8302}{\milli\second} & \qty{5.91987}{\second} \\
+            LIMIT 1000000 & 10 & 1 & \qty{681.953}{\milli\second} & \qty{29.958}{\milli\second} & \qty{7.03145}{\second} \\
             \bottomrule
         \end{tabular}
-        \caption{JSON File Reading Performance Benchmark Results}
+        \caption{openGauss SELECT Performance (Retrieval Test 1)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            File Loading & 10 & 1 & \qty{742.861}{\milli\second} & \qty{96.3481}{\milli\second} & \qty{6.40674}{\second} \\
+            Reading 100 & 10 & 1667 & \qty{14.3659}{\nano\second} & \qty{0.680831}{\nano\second} & \qty{216.71}{\micro\second} \\
+            Reading 500 & 10 & 226 & \qty{123.442}{\nano\second} & \qty{11.9236}{\nano\second} & \qty{223.74}{\micro\second} \\
+            Reading 1000 & 10 & 58 & \qty{607.379}{\nano\second} & \qty{100.921}{\nano\second} & \qty{225.62}{\micro\second} \\
+            Reading 5000 & 10 & 12 & \qty{6.36233}{\micro\second} & \qty{2.71459}{\micro\second} & \qty{241.44}{\micro\second} \\
+            Reading 10000 & 10 & 6 & \qty{26.198}{\micro\second} & \qty{9.67607}{\micro\second} & \qty{253.02}{\micro\second} \\
+            Reading 50000 & 10 & 1 & \qty{686.888}{\micro\second} & \qty{285.85}{\micro\second} & \qty{381.31}{\micro\second} \\
+            Reading 100000 & 10 & 1 & \qty{1.20072}{\milli\second} & \qty{432.117}{\micro\second} & \qty{2.84476}{\milli\second} \\
+            Reading 500000 & 10 & 1 & \qty{3.02301}{\milli\second} & \qty{939.154}{\micro\second} & \qty{19.0127}{\milli\second} \\
+            Reading 1000000 & 10 & 1 & \qty{4.68098}{\milli\second} & \qty{2.55451}{\milli\second} & \qty{61.3399}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{JSON Retrieval Test 1 Results}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Query} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            File Loading & 10 & 1 & \qty{206.3}{\milli\second} & \qty{10.0127}{\milli\second} & \qty{2.04334}{\second} \\
+            Reading 100 & 10 & 1456 & \qty{17.636}{\nano\second} & \qty{3.11438}{\nano\second} & \qty{218.4}{\micro\second} \\
+            Reading 500 & 10 & 203 & \qty{115.507}{\nano\second} & \qty{17.2625}{\nano\second} & \qty{221.27}{\micro\second} \\
+            Reading 1000 & 10 & 48 & \qty{515.583}{\nano\second} & \qty{46.9934}{\nano\second} & \qty{225.6}{\micro\second} \\
+            Reading 5000 & 10 & 11 & \qty{3.30255}{\micro\second} & \qty{137.585}{\nano\second} & \qty{233.86}{\micro\second} \\
+            Reading 10000 & 10 & 6 & \qty{10.4497}{\micro\second} & \qty{1.63265}{\micro\second} & \qty{254.94}{\micro\second} \\
+            Reading 50000 & 10 & 1 & \qty{208.638}{\micro\second} & \qty{104.035}{\micro\second} & \qty{348.13}{\micro\second} \\
+            Reading 100000 & 10 & 1 & \qty{346.648}{\micro\second} & \qty{45.1029}{\micro\second} & \qty{641.83}{\micro\second} \\
+            Reading 500000 & 10 & 1 & \qty{1.73475}{\milli\second} & \qty{469.347}{\micro\second} & \qty{18.2551}{\milli\second} \\
+            Reading 1000000 & 10 & 1 & \qty{4.6492}{\milli\second} & \qty{1.90727}{\milli\second} & \qty{36.3955}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{BEVE Retrieval Test 1 Results}
+    \end{table}
+    
+    \subsection{Retrieval Test 2}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Join Filter} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            > 2000-01-01 & 10 & 1 & \qty{17.547}{\milli\second} & \qty{824.177}{\micro\second} & \qty{126.665}{\milli\second} \\
+            > 1999-01-01 & 10 & 1 & \qty{34.5756}{\milli\second} & \qty{2.80765}{\milli\second} & \qty{4.12239}{\second} \\
+            > 1998-01-01 & 10 & 1 & \qty{93.0941}{\milli\second} & \qty{49.3798}{\milli\second} & \qty{7.89215}{\second} \\
+            > 1997-01-01 & 10 & 1 & \qty{184.327}{\milli\second} & \qty{31.322}{\milli\second} & \qty{6.83517}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{PostgreSQL Join Query Performance (Retrieval Test 2)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Join Filter} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            > 2000-01-01 & 10 & 1 & \qty{34.0926}{\milli\second} & \qty{934.005}{\micro\second} & \qty{368.575}{\milli\second} \\
+            > 1999-01-01 & 10 & 1 & \qty{182.512}{\milli\second} & \qty{5.99336}{\milli\second} & \qty{1.91313}{\second} \\
+            > 1998-01-01 & 10 & 1 & \qty{313.017}{\milli\second} & \qty{11.014}{\milli\second} & \qty{3.15403}{\second} \\
+            > 1997-01-01 & 10 & 1 & \qty{467.861}{\milli\second} & \qty{6.56789}{\milli\second} & \qty{4.69977}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{openGauss Join Query Performance (Retrieval Test 2)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Join Filter} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            JSON Reading & 10 & 1 & \qty{832.131}{\milli\second} & \qty{14.9833}{\milli\second} & \qty{8.54748}{\second} \\
+            > 2000-01-01 & 10 & 1 & \qty{10.5896}{\milli\second} & \qty{2.25561}{\milli\second} & \qty{83.7742}{\milli\second} \\
+            > 1999-01-01 & 10 & 1 & \qty{12.82}{\milli\second} & \qty{1.94556}{\milli\second} & \qty{110.761}{\milli\second} \\
+            > 1998-01-01 & 10 & 1 & \qty{15.0948}{\milli\second} & \qty{2.0567}{\milli\second} & \qty{133.673}{\milli\second} \\
+            > 1997-01-01 & 10 & 1 & \qty{16.6291}{\milli\second} & \qty{2.13856}{\milli\second} & \qty{159.399}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{JSON Join Query Performance (Retrieval Test 2)}
+    \end{table}
+    
+    \subsection{Retrieval Test 3}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Aggregate} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            Aggregate & 10 & 1 & \qty{270.564}{\milli\second} & \qty{18.8131}{\milli\second} & \qty{5.10855}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{PostgreSQL Aggregate Query Performance (Retrieval Test 3)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Aggregate} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            Aggregate & 10 & 1 & \qty{615.559}{\milli\second} & \qty{73.6808}{\milli\second} & \qty{6.64675}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{openGauss Aggregate Query Performance (Retrieval Test 3)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Aggregate} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            JSON Reading & 10 & 1 & \qty{691.756}{\milli\second} & \qty{70.7634}{\milli\second} & \qty{5.14514}{\second} \\
+            Aggregate & 10 & 1 & \qty{20.7729}{\milli\second} & \qty{3.31591}{\milli\second} & \qty{156.136}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{JSON Aggregate Query Performance (Retrieval Test 3)}
+    \end{table}
+    
+    \subsection{Retrieval Test 4}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Engine} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            PostgreSQL & 10 & 1 & \qty{21.8753}{\milli\second} & \qty{1.605}{\milli\second} & \qty{197.325}{\milli\second} \\
+            openGauss & 10 & 1 & \qty{42.2907}{\milli\second} & \qty{677.885}{\micro\second} & \qty{426.83}{\milli\second} \\
+            JSON & 10 & 1 & \qty{5.74589}{\milli\second} & \qty{1.89258}{\milli\second} & \qty{52.3803}{\milli\second} \\
+            JSON File Loading & 10 & 1 & \qty{163.438}{\milli\second} & \qty{6.89817}{\milli\second} & \qty{1.77227}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{Text Search Performance (Retrieval Test 4)}
+    \end{table}
+    
+    \subsection{Retrieval Test 5}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Date Range} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            1995-01-01 to 1997-12-31 & 10 & 1 & \qty{34.0679}{\milli\second} & \qty{2.95471}{\milli\second} & \qty{283.784}{\milli\second} \\
+            1992-01-01 to 2000-12-31 & 10 & 1 & \qty{65.4671}{\milli\second} & \qty{2.14729}{\milli\second} & \qty{655.673}{\milli\second} \\
+            1990-01-01 to 2022-12-31 & 10 & 1 & \qty{86.5669}{\milli\second} & \qty{3.91015}{\milli\second} & \qty{845.364}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{PostgreSQL Date Range Query Performance (Retrieval Test 5)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Date Range} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            1995-01-01 to 1997-12-31 & 10 & 1 & \qty{48.0719}{\milli\second} & \qty{2.38709}{\milli\second} & \qty{470.786}{\milli\second} \\
+            1992-01-01 to 2000-12-31 & 10 & 1 & \qty{92.2885}{\milli\second} & \qty{4.68216}{\milli\second} & \qty{922.416}{\milli\second} \\
+            1990-01-01 to 2022-12-31 & 10 & 1 & \qty{127.505}{\milli\second} & \qty{5.40044}{\milli\second} & \qty{1.24396}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{openGauss Date Range Query Performance (Retrieval Test 5)}
+    \end{table}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Date Range} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            JSON Employee Loading & 10 & 1 & \qty{138.009}{\milli\second} & \qty{9.53802}{\milli\second} & \qty{1.40578}{\second} \\
+            1995-01-01 to 1997-12-31 & 10 & 1 & \qty{11.22}{\milli\second} & \qty{2.58505}{\milli\second} & \qty{106.138}{\milli\second} \\
+            1992-01-01 to 2000-12-31 & 10 & 1 & \qty{12.5463}{\milli\second} & \qty{2.91384}{\milli\second} & \qty{118.255}{\milli\second} \\
+            1990-01-01 to 2022-12-31 & 10 & 1 & \qty{11.9194}{\milli\second} & \qty{1.85084}{\milli\second} & \qty{140.438}{\milli\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{JSON Date Range Query Performance (Retrieval Test 5)}
+    \end{table}
+    
+    \subsection{Update Test 1}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Update 1} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            PostgreSQL & 10 & 1 & \qty{3.96289}{\milli\second} & \qty{1.13143}{\milli\second} & \qty{26.895}{\milli\second} \\
+            openGauss & 10 & 1 & \qty{3.51769}{\milli\second} & \qty{795.448}{\micro\second} & \qty{27.6951}{\milli\second} \\
+            JSON & 10 & 1 & \qty{264.204}{\milli\second} & \qty{13.6148}{\milli\second} & \qty{2.60646}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 1 Performance}
+    \end{table}
+    
+    \subsection{Update Test 2}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Update 2} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            PostgreSQL & 10 & 1 & \qty{838.78}{\milli\second} & \qty{112.592}{\milli\second} & \qty{14.2564}{\second} \\
+            openGauss & 10 & 1 & \qty{1.49578}{\second} & \qty{127.423}{\milli\second} & \qty{20.9112}{\second} \\
+            JSON & 10 & 1 & \qty{1.40019}{\second} & \qty{142.632}{\milli\second} & \qty{15.2397}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 2 Performance}
+    \end{table}
+    
+    \subsection{Update Test 3}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Update 3} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            PostgreSQL & 10 & 1 & \qty{34.2222}{\milli\second} & \qty{887.247}{\micro\second} & \qty{310.753}{\milli\second} \\
+            openGauss & 10 & 1 & \qty{55.9333}{\milli\second} & \qty{6.25615}{\milli\second} & \qty{526.343}{\milli\second} \\
+            JSON & 10 & 1 & \qty{149.989}{\milli\second} & \qty{4.71099}{\milli\second} & \qty{1.54974}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 3 Performance}
+    \end{table}
+    
+    \subsection{Update Test 4}
+    
+    \begin{table}[H]
+        \centering        
+        \begin{tabular}{lrrrrr}
+            \toprule
+            \textbf{Update 4} & \textbf{Samples} & \textbf{Iterations} & \textbf{Mean Time} & \textbf{Std Dev} & \textbf{Est. Run Time} \\
+            \midrule
+            PostgreSQL & 10 & 1 & \qty{26.7132}{\milli\second} & \qty{5.25692}{\milli\second} & \qty{4.9482}{\second} \\
+            openGauss & 10 & 1 & \qty{46.4891}{\milli\second} & \qty{6.59066}{\milli\second} & \qty{8.44997}{\second} \\
+            JSON & 10 & 1 & \qty{218.601}{\milli\second} & \qty{9.42636}{\milli\second} & \qty{2.274}{\second} \\
+            \bottomrule
+        \end{tabular}
+        \caption{Update Test 4 Performance}
     \end{table}
     
     \section{Appendix D: Test Code}
