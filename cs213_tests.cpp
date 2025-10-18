@@ -777,9 +777,6 @@ TEST_CASE("update-test-1-opengauss", "[update-open][update-test-1][update-test]"
 
 TEST_CASE("update-test-1-json", "[update-json][update-test-1][update-test]") { UPDATE_1_BENCH_JSON(); }
 
-// Update test 2:
-// UPDATE salary SET amount = amount + 1 WHERE to_date = '9999-01-01'
-
 #define UPDATE_2_BENCH_PG()                                                                                            \
     BENCHMARK_ADVANCED("Update 2 PostgreSQL")(Catch::Benchmark::Chronometer meter) {                                   \
         pqxx::connection conn{pg_conn_str.data()};                                                                     \
